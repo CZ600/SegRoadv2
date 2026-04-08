@@ -51,6 +51,15 @@ def read_txt(file):
         a = [i.replace('\n','') for i in a]
         return a
 
+def read_deepglobe_split(split_file, dataset_root):
+    lines = []
+    for line in read_txt(split_file):
+        image_rel, mask_rel = line.split()
+        image_path = os.path.normpath(os.path.join(dataset_root, image_rel))
+        mask_path = os.path.normpath(os.path.join(dataset_root, mask_rel))
+        lines.append(f"{image_path} {mask_path}")
+    return lines
+
 
 
 if __name__ == "__main__":
@@ -75,11 +84,11 @@ if __name__ == "__main__":
     #       设置            distributed = True
     #       在终端中输入    CUDA_VISIBLE_DEVICES=0,1 python -m torch.distributed.launch --nproc_per_node=2 train.py
     #---------------------------------------------------------------------#
-    distributed     = True
+    distributed     = False
     #---------------------------------------------------------------------#
     #   sync_bn     是否使用sync_bn，DDP模式多卡可用
     #---------------------------------------------------------------------#
-    sync_bn         = True
+    sync_bn         = False
     #---------------------------------------------------------------------#
     #   fp16        是否使用混合精度训练
     #               可减少约一半的显存、需要pytorch1.7.1以上
@@ -121,7 +130,7 @@ if __name__ == "__main__":
     #   如果一定要从0开始，可以了解imagenet数据集，首先训练分类模型，获得网络的主干部分权值，分类模型的 主干部分 和该模型通用，基于此进行训练。
     #----------------------------------------------------------------------------------------------------------------------------#
     # model_path      = "model_data/segformer_b0_weights_voc.pth"
-    model_path = "logs/last_epoch_weights_b2_stripe_conv_new_dcn2x_seg_gla.pth"
+    model_path = ""
     #------------------------------#
     #   输入图片的大小
     #------------------------------#
@@ -169,7 +178,7 @@ if __name__ == "__main__":
     #------------------------------------------------------------------#
     Init_Epoch          = 0
     Freeze_Epoch        = 0
-    Freeze_batch_size   = 4*2
+    Freeze_batch_size   = 4
     #------------------------------------------------------------------#
     #   解冻阶段训练参数
     #   此时模型的主干不被冻结了，特征提取网络会发生改变
@@ -178,7 +187,7 @@ if __name__ == "__main__":
     #   Unfreeze_batch_size     模型在解冻后的batch_size
     #------------------------------------------------------------------#
     UnFreeze_Epoch      = 100
-    Unfreeze_batch_size = 4*2
+    Unfreeze_batch_size = 4
     #------------------------------------------------------------------#
     #   Freeze_Train    是否进行冻结训练
     #                   默认先冻结主干训练后解冻训练。ddd
@@ -213,7 +222,7 @@ if __name__ == "__main__":
     #------------------------------------------------------------------#
     #   save_period     多少个epoch保存一次权值
     #------------------------------------------------------------------#
-    save_period         = 10
+    save_period         = 5
     #------------------------------------------------------------------#
     #   save_dir        权值与日志文件保存的文件夹
     #------------------------------------------------------------------#
@@ -227,12 +236,12 @@ if __name__ == "__main__":
     #   （二）此处设置评估参数较为保守，目的是加快评估速度。
     #------------------------------------------------------------------#
     eval_flag           = True
-    eval_period         = 10
+    eval_period         = 1
 
     #------------------------------------------------------------------#
     #   VOCdevkit_path  数据集路径
     #------------------------------------------------------------------#
-    VOCdevkit_path  = 'VOCdevkit'
+    VOCdevkit_path  = r'D:\project\pythonProject\Road_Identification\SAM2-UNet\deepglobe'
     #------------------------------------------------------------------#
     #   建议选项：
     #   种类少（几类）时，设置为True
@@ -252,7 +261,7 @@ if __name__ == "__main__":
     #   cls_weights = np.array([1, 2, 3], np.float32)
     #------------------------------------------------------------------#
     # cls_weights     = np.ones([num_classes], np.float32)
-    cls_weights = np.array([1,3], np.float32)
+    cls_weights = np.array([1, 3], np.float32)
     #------------------------------------------------------------------#
     #   num_workers     用于设置是否使用多线程读取数据，1代表关闭多线程
     #                   开启后会加快数据读取速度，但是会占用更多内存
@@ -335,6 +344,7 @@ if __name__ == "__main__":
     #----------------------#
     if local_rank == 0:
         time_str        = datetime.datetime.strftime(datetime.datetime.now(),'%Y_%m_%d_%H_%M_%S')
+        os.makedirs(save_dir, exist_ok=True)
         log_dir         = os.path.join(save_dir, "loss_" + str(time_str))
         loss_history    = LossHistory(log_dir, model, input_shape=input_shape)
     else:
@@ -382,12 +392,12 @@ if __name__ == "__main__":
     # num_val     = len(val_lines)
 
 
-if os.path.exists('./model_data/train_val'):
+if os.path.exists(VOCdevkit_path):
     train_lines = []
     val_lines = []
 
-    train_lines = read_txt('./model_data/train_val/train_deepglobe.txt')
-    val_lines = read_txt('./model_data/train_val/val_deepglobe.txt')
+    train_lines = read_deepglobe_split(os.path.join(VOCdevkit_path, 'train.txt'), VOCdevkit_path)
+    val_lines = read_deepglobe_split(os.path.join(VOCdevkit_path, 'val.txt'), VOCdevkit_path)
     # train_lines = train_lines[:1000]
     # val_lines = val_lines[:1000]
     num_train   = len(train_lines)

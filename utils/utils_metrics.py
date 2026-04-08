@@ -54,6 +54,32 @@ def per_class_Precision(hist):
 def per_Accuracy(hist):
     return np.sum(np.diag(hist)) / np.maximum(np.sum(hist), 1) 
 
+def summarize_segmentation_metrics(hist, ious=None, recalls=None, precisions=None, positive_class=1):
+    hist = np.asarray(hist)
+    if ious is None:
+        ious = per_class_iu(hist)
+    if recalls is None:
+        recalls = per_class_PA_Recall(hist)
+    if precisions is None:
+        precisions = per_class_Precision(hist)
+
+    positive_class = min(max(positive_class, 0), len(ious) - 1)
+    road_precision = float(precisions[positive_class])
+    road_recall = float(recalls[positive_class])
+    road_iou = float(ious[positive_class])
+    road_f1 = float((2 * road_precision * road_recall) / np.maximum(road_precision + road_recall, 1e-12))
+
+    return {
+        "miou": float(np.nanmean(ious)),
+        "accuracy": float(per_Accuracy(hist)),
+        "mean_precision": float(np.nanmean(precisions)),
+        "mean_recall": float(np.nanmean(recalls)),
+        "road_iou": road_iou,
+        "road_precision": road_precision,
+        "road_recall": road_recall,
+        "road_f1": road_f1,
+    }
+
 def compute_mIoU(gt_dir, pred_dir, png_name_list, num_classes, name_classes=None):  
     print('Num classes', num_classes)  
     #-----------------------------------------#
@@ -66,7 +92,7 @@ def compute_mIoU(gt_dir, pred_dir, png_name_list, num_classes, name_classes=None
     #   获得验证集图像分割结果路径列表，方便直接读取
     #------------------------------------------------#
     gt_imgs     = [x.split(' ')[1] for x in png_name_list]  
-    pred_imgs   = [join(pred_dir, x.split(' ')[0].split('/')[-1].split('.')[0] + ".png") for x in png_name_list]  
+    pred_imgs   = [join(pred_dir, os.path.splitext(os.path.basename(x.split(' ')[0]))[0] + ".png") for x in png_name_list]  
 
     #------------------------------------------------#
     #   读取每一个（图片-标签）对
